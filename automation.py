@@ -6,7 +6,7 @@
 	Updates IP Tables (Firewall) based on processes.
 	Scans for vulnerabilities in the underlying system
 
-	Dependencies: install wget, nmap (if possible, if not, script will install it), tar 
+	Dependencies: install wget, nmap (if possible, if not, script will install it), tar, iptables 
 
 	Algorithm:
 		(1) Scan For Vulnerable Services --> Parse Services Returned --> Update / Harden Accodingly (Determine version, check against latest update)
@@ -271,8 +271,49 @@ def run_background_nmap():
 		ip_list = ip_addr
 		final_ip = ip_list.split()[1] #String of '192.168.1.X'
 
+		#NMAP Command, Scans ALL TCP Ports // '&' makes it run in background
+		scan = "nmap -p 1-65535 -T4 -A -vv" + " " + final_ip + " " + "&"
 
-		p = subprocess.Popen(["nmap", "-vv"], stdout=subprocess.PIPE, shell=True)
+		p = subprocess.Popen(scan, stdout=subprocess.PIPE, shell=True)
+		(scan_results, err) = p.communicate()
+		nmap_output = scan_results
+		nmap_output = nmap_output.split()
+
+
+def common_vuln_check():
+	RPC = "rpcinfo"
+	RPC_CHECK = os.system(RPC)
+	if RPC_CHECK == 0:
+		p = subprocess.Popen(RPC, stdout=subprocess.PIPE, shell=True)
+		(rpc_tuple, err) = p.communicate()
+		fix_rpc(rpc_tuple)
 
 
 
+
+def fix_rpc(rpc_tuple):
+	rpc_list = rpc_tuple
+	rpc_list.split()
+
+	#Block RPC Port Mapper: port 111 (TCP & UDP)
+	#	   Windows RPC:		port 135 (TCP & UDP)
+	block_rpc = "iptables -A INPUT -p tcp --destination-port 111 -j DROP"
+	block_rpc_win = "iptables -A INPUT -p tcp --destination-port 135 -j DROP"
+
+	block_rpc_udp = "iptables -A INPUT -p udp --destination-port 111 -j DROP"
+	block_rpc_win_udp = "iptables -A INPUT -p udp --destination-port 135 -j DROP"
+
+	os.system(block_rpc)
+	os.system(block_rpc_win)
+	os.system(block_rpc_udp)
+	os.system(block_rpc_win_udp)
+	print "------RPC Service Blocked on Ports 111, 135, Firewall Updated-----"
+
+	#Block the RPC "loopback" ports, 32770-32789 (TCP and UDP).
+	port = 32770
+	while(port <= 32789):
+		block_loopback = "iptables -A INPUT -p tcp --destination-port " + port + " " + "-j DROP"
+		block_loopback_udp = "iptables -A INPUT -p udp --destination-port " + port + " " + "-j DROP"
+		port++
+		os.system(block_loopback)
+		os.system(block_loopback_udp)

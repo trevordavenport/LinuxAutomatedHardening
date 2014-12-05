@@ -6,6 +6,8 @@
 	Updates IP Tables (Firewall) based on processes.
 	Scans for vulnerabilities in the underlying system
 
+	Dependencies: install wget, nmap (if possible, if not, script will install it), tar 
+
 	Algorithm:
 		(1) Scan For Vulnerable Services --> Parse Services Returned --> Update / Harden Accodingly (Determine version, check against latest update)
 		(2) Run nmap in the background, wait for results to return 
@@ -225,6 +227,52 @@ VULNERABLE_PORTS 	= [65301, 49401, 49400, 32899, 32770, 8000, 7100, 6000, 6255, 
 					   119, 123, 135, 137, 138, 139, 143, 161, 162, 177, 179, 256, 264, 389, 500, 512, 513, 514, 515, 517, 520, 540, 593, 
 					   631, 636, 898, 901, 1025, 1039, 1080, 1352, 1433, 1434, 1494, 1512, 1521, 2049]
 
+VULNERABLE_SERVICES = ['ssh', 'OpenSSL', 'rpc', 'SNMP', 'Sendmail', 'Apache', 'BIND', 'Java', 'telnet', 'VNC', 'X11', 'rshell', 'WINS',
+						'NTP', 'NNTP', 'LDAP']
+
 
 CLEAR_TEXT_SERVICES = ['FTP', 'TFTP', 'telnet', 'SMTP', 'POP3', 'IMAP', 'rlogin', 'rsh', 'HTTP']
 CLEAR_TEXT_PORTS	= [20,21,23,25,110,143,513,514,80]
+
+nmap_output = []
+
+
+
+def run_background_nmap():
+	#Determine if nmap is on system
+	nmap_check = "nmap -V"
+	EXIT_VALUE = os.system(nmap_check)
+
+	#nmap does not exist
+	if(EXIT_VALUE != 0):
+		#Download nmap 
+		DL_nmap = "sudo apt-get install nmap"
+		RET = os.system(DL_nmap)
+		if(RET != 0):
+			#wget nmap, or curl it 
+			LINK = "wget http://nmap.org/dist/nmap-6.47.tar.bz2"
+			WGET_RET = os.system(LINK)
+			
+			#Extract and configure
+			os.system("tar -vxjf nmap-6.47.tar.bz2") #Extracts nmap into current directory
+			os.system("cd nmap-6.47")
+			os.system("./configure")
+			os.system("make && make install")
+
+	#Nmap should be installed now.
+	#Sanity Check
+	SANITY_CHECK = os.system(nmap_check)
+	if(SANITY_CHECK == 0):
+		#Really hacky way to find IP
+		IP_QUERY = 'ifconfig wlan0 | grep "inet addr" | awk "{print $2}" | sed "s/addr://"'
+		ip = subprocess.Popen(IP_QUERY, stdout=subprocess.PIPE, shell=True)
+		(ip_addr, err) = ip.communicate()
+		ip_list = []
+		ip_list = ip_addr
+		final_ip = ip_list.split()[1] #String of '192.168.1.X'
+
+
+		p = subprocess.Popen(["nmap", "-vv"], stdout=subprocess.PIPE, shell=True)
+
+
+

@@ -222,19 +222,19 @@ __copyright__ = 'BERK1337 Security Team'
 __author__	  = 'Trevor Davenport'
 __version__   = '1.3.3.7'
 
-VULNERABLE_PORTS 	= [20, 21, 23, 25, 110, 143, 513, 514, 65301, 49401, 49400, 32899, 32770, 8000, 7100, 6000, 6255, 5900, 5800, 5632, 5631, 5987, 4045, 3389, 3306, 3269,
+VULNERABLE_PORTS    = [20, 21, 23, 25, 110, 143, 513, 514, 65301, 49401, 49400, 32899, 32770, 8000, 7100, 6000, 6255, 5900, 5800, 5632, 5631, 5987, 4045, 3389, 3306, 3269,
 					   3268, 3128, 2401, 2381, 2301, 20, 21, 22, 23, 25, 37, 42, 53, 67, 68, 69, 70, 79, 80, 81, 88, 98, 109, 110, 111, 
 					   119, 123, 135, 137, 138, 139, 143, 161, 162, 177, 179, 256, 264, 389, 500, 512, 513, 514, 515, 517, 520, 540, 593, 
 					   631, 636, 898, 901, 1025, 1039, 1080, 1352, 1433, 1434, 1494, 1512, 1521, 2049]
-
 VULNERABLE_SERVICES = ['ssh', 'OpenSSL', 'rpc', 'SNMP', 'Sendmail', 'Apache', 'BIND', 'Java', 'telnet', 'VNC', 'X11', 'rshell', 'WINS',
 						'NTP', 'NNTP', 'LDAP']
 
-
 CLEAR_TEXT_SERVICES = ['FTP', 'TFTP', 'telnet', 'SMTP', 'POP3', 'IMAP', 'rlogin', 'rsh', 'HTTP']
-CLEAR_TEXT_PORTS	= [20,21,23,25,110,143,513,514,80]
+CLEAR_TEXT_PORTS    = [20,21,23,25,110,143,513,514,80]
 
-nmap_output = []
+nmap_output         = []
+vuln_port_scan      = []
+final_ip 	    = ''
 
 
 
@@ -247,10 +247,10 @@ def run_background_nmap():
 	if(EXIT_VALUE != 0):
 		#Download nmap 
 		DL_nmap = "sudo apt-get install nmap"
-		RET = os.system(DL_nmap)
+		RET     = os.system(DL_nmap)
 		if(RET != 0):
 			#wget nmap, or curl it 
-			LINK = "wget http://nmap.org/dist/nmap-6.47.tar.bz2"
+			LINK     = "wget http://nmap.org/dist/nmap-6.47.tar.bz2"
 			WGET_RET = os.system(LINK)
 			if WGET_RET != 0:
 				#Install wget
@@ -270,7 +270,7 @@ def run_background_nmap():
 		#Really hacky way to find IP
 		IP_QUERY = 'ifconfig wlan0 | grep "inet addr" | awk "{print $2}" | sed "s/addr://"'
 		ip = subprocess.Popen(IP_QUERY, stdout=subprocess.PIPE, shell=True)
-		(ip_addr, err) = ip.communicate()
+		(ip_addr, err)     = ip.communicate()
 		ip_list 	   = []
 		ip_list 	   = ip_addr
 		final_ip 	   = ip_list.split()[1] #String of '192.168.1.X'
@@ -286,8 +286,8 @@ def run_background_nmap():
 
 def common_vuln_check():
 	''' _____________________________________ 
-					RPC Checks
-		_____________________________________
+			RPC Checks
+	    _____________________________________
 	'''
 	RPC 	  = "rpcinfo"
 	RPC_CHECK = os.system(RPC)
@@ -297,11 +297,11 @@ def common_vuln_check():
 		fix_rpc(rpc_tuple)
 
 	''' _____________________________________ 
-					OpenSSL Checks
-		_____________________________________
+			OpenSSL Checks
+	    _____________________________________
 	'''
 	OPENSSL 	 = "openssl version"
-	VULN_VERSION = '1.0.1' #Most up-to-date 1.0.1j [As of 12/7/14]
+	VULN_VERSION     = '1.0.1' #Most up-to-date 1.0.1j [As of 12/7/14]
 
 	p = subprocess.Popen(OPENSSL, stdout=subprocess.PIPE, shell=True)
 	(SSLversion, err) = p.communicate()
@@ -324,10 +324,10 @@ def common_vuln_check():
 			print "------ VERSION: " + curr_version + "--------"
 
 	''' _____________________________________ 
-					SSH Checks
-		_____________________________________
+			SSH Checks
+	    _____________________________________
 	'''
-	SSH 		 = "ssh -V"
+	SSH 	     = "ssh -V"
 	SSH_VULN_VER = "6.3"																																																																					"
 
 	#Having weird issues with SSH version output, not saving, auto runs on command line.
@@ -340,11 +340,11 @@ def fix_rpc(rpc_tuple):
 	rpc_list.split()
 
 	#Block RPC Port Mapper: port 111 (TCP & UDP)
-	#Windows RPC:			port 135 (TCP & UDP)
-	block_rpc = "iptables -A INPUT -p tcp --destination-port 111 -j DROP"
+	#Windows RPC:		port 135 (TCP & UDP)
+	block_rpc     = "iptables -A INPUT -p tcp --destination-port 111 -j DROP"
 	block_rpc_win = "iptables -A INPUT -p tcp --destination-port 135 -j DROP"
 
-	block_rpc_udp = "iptables -A INPUT -p udp --destination-port 111 -j DROP"
+	block_rpc_udp     = "iptables -A INPUT -p udp --destination-port 111 -j DROP"
 	block_rpc_win_udp = "iptables -A INPUT -p udp --destination-port 135 -j DROP"
 
 	os.system(block_rpc)
@@ -356,7 +356,7 @@ def fix_rpc(rpc_tuple):
 	#Block the RPC "loopback" ports, 32770-32789 (TCP and UDP).
 	port = 32770
 	while(port <= 32789):
-		block_loopback = "iptables -A INPUT -p tcp --destination-port " + port + " " + "-j DROP"
+		block_loopback     = "iptables -A INPUT -p tcp --destination-port " + port + " " + "-j DROP"
 		block_loopback_udp = "iptables -A INPUT -p udp --destination-port " + port + " " + "-j DROP"
 		port++
 		os.system(block_loopback)
@@ -371,12 +371,10 @@ def scan_services():
 
 
 def nmap_vuln_ports():
-
-
+	scan = "nmap -p"
 	for ports in VULNERABLE_PORTS:
-
-	scan = "nmap -p 1-65535 -T4 -A -vv" + " " + final_ip #+ " " + "&"
-
+	    scan += " " + str(ports)
+	scan += " -T4 -A -vv " + final_ip
 	p = subprocess.Popen(scan, stdout=subprocess.PIPE, shell=True)
 	(scan_results, err) = p.communicate()
-	nmap_output 	    = scan_results
+	vuln_port_scan 	    = scan_results

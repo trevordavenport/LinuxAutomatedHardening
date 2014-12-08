@@ -214,15 +214,15 @@ Clear-Text Services Fix (Services that lack encryption / send data in plain-text
 	PCANYWHERE	65301	tcp	remote administration
 '''
 
-from os import *
-from sys import *
-from subprocess import *
+import os
+import sys
+import subprocess
 
 __copyright__ = 'BERK1337 Security Team'
 __author__	  = 'Trevor Davenport'
 __version__   = '1.3.3.7'
 
-VULNERABLE_PORTS 	= [65301, 49401, 49400, 32899, 32770, 8000, 7100, 6000, 6255, 5900, 5800, 5632, 5631, 5987, 4045, 3389, 3306, 3269,
+VULNERABLE_PORTS 	= [20, 21, 23, 25, 110, 143, 513, 514, 65301, 49401, 49400, 32899, 32770, 8000, 7100, 6000, 6255, 5900, 5800, 5632, 5631, 5987, 4045, 3389, 3306, 3269,
 					   3268, 3128, 2401, 2381, 2301, 20, 21, 22, 23, 25, 37, 42, 53, 67, 68, 69, 70, 79, 80, 81, 88, 98, 109, 110, 111, 
 					   119, 123, 135, 137, 138, 139, 143, 161, 162, 177, 179, 256, 264, 389, 500, 512, 513, 514, 515, 517, 520, 540, 593, 
 					   631, 636, 898, 901, 1025, 1039, 1080, 1352, 1433, 1434, 1494, 1512, 1521, 2049]
@@ -252,12 +252,16 @@ def run_background_nmap():
 			#wget nmap, or curl it 
 			LINK = "wget http://nmap.org/dist/nmap-6.47.tar.bz2"
 			WGET_RET = os.system(LINK)
-			
+			if WGET_RET != 0:
+				#Install wget
+				WGET_INSTALL = "sudo apt-get install wget"
+				os.system(WGET_INSTALL)
+				os.system(LINK)
 			#Extract and configure
 			os.system("tar -vxjf nmap-6.47.tar.bz2") #Extracts nmap into current directory
 			os.system("cd nmap-6.47")
 			os.system("./configure")
-			os.system("make && make install")
+			os.system("make && sudo make install")
 
 	#Nmap should be installed now.
 	#Sanity Check
@@ -267,28 +271,68 @@ def run_background_nmap():
 		IP_QUERY = 'ifconfig wlan0 | grep "inet addr" | awk "{print $2}" | sed "s/addr://"'
 		ip = subprocess.Popen(IP_QUERY, stdout=subprocess.PIPE, shell=True)
 		(ip_addr, err) = ip.communicate()
-		ip_list = []
-		ip_list = ip_addr
-		final_ip = ip_list.split()[1] #String of '192.168.1.X'
+		ip_list 	   = []
+		ip_list 	   = ip_addr
+		final_ip 	   = ip_list.split()[1] #String of '192.168.1.X'
 
 		#NMAP Command, Scans ALL TCP Ports // '&' makes it run in background
-		scan = "nmap -p 1-65535 -T4 -A -vv" + " " + final_ip + " " + "&"
+		scan = "nmap -p 1-65535 -T4 -A -vv" + " " + final_ip #+ " " + "&"
 
 		p = subprocess.Popen(scan, stdout=subprocess.PIPE, shell=True)
 		(scan_results, err) = p.communicate()
-		nmap_output = scan_results
-		nmap_output = nmap_output.split()
+		nmap_output 	    = scan_results
+		#nmap_output = nmap_output.split()
 
 
 def common_vuln_check():
-	RPC = "rpcinfo"
+	''' _____________________________________ 
+					RPC Checks
+		_____________________________________
+	'''
+	RPC 	  = "rpcinfo"
 	RPC_CHECK = os.system(RPC)
 	if RPC_CHECK == 0:
 		p = subprocess.Popen(RPC, stdout=subprocess.PIPE, shell=True)
 		(rpc_tuple, err) = p.communicate()
 		fix_rpc(rpc_tuple)
 
+	''' _____________________________________ 
+					OpenSSL Checks
+		_____________________________________
+	'''
+	OPENSSL 	 = "openssl version"
+	VULN_VERSION = '1.0.1' #Most up-to-date 1.0.1j [As of 12/7/14]
 
+	p = subprocess.Popen(OPENSSL, stdout=subprocess.PIPE, shell=True)
+	(SSLversion, err) = p.communicate()
+	if(err == None):
+		#SSLVersion must be > 1.0.1j
+		curr_version = SSLversion.split()[1]
+		if curr_version < VULN_VERSION:
+			print "------ OPENSSL Outdated & Vulnerable! -------"
+			print "------ UPDATING NOW. Sit Tight :] -----------"
+			WGET_SSL = "wget https://www.openssl.org/source/openssl-1.0.1j.tar.gz"
+			os.system(WGET_SSL)
+			#Extract and configure																																															
+			os.system("tar -vxjf openssl-1.0.1j.tar.gz") #Extracts nmap into current directory
+			os.system("cd openssl-1.0.1j.tar.gz")																																																														
+			os.system("./config")
+			os.system("make && make test")
+			os.system("sudo make install")
+		else:
+			print "------ OPENSSL Up-To-Date --------"
+			print "------ VERSION: " + curr_version + "--------"
+
+	''' _____________________________________ 
+					SSH Checks
+		_____________________________________
+	'''
+	SSH 		 = "ssh -V"
+	SSH_VULN_VER = "6.3"																																																																					"
+
+	#Having weird issues with SSH version output, not saving, auto runs on command line.
+	p = subprocess.Popen(SSH, stdout=subprocess.PIPE, shell=True)
+	(SSHversion, err) = p.communicate()
 
 
 def fix_rpc(rpc_tuple):
@@ -296,7 +340,7 @@ def fix_rpc(rpc_tuple):
 	rpc_list.split()
 
 	#Block RPC Port Mapper: port 111 (TCP & UDP)
-	#	   Windows RPC:		port 135 (TCP & UDP)
+	#Windows RPC:			port 135 (TCP & UDP)
 	block_rpc = "iptables -A INPUT -p tcp --destination-port 111 -j DROP"
 	block_rpc_win = "iptables -A INPUT -p tcp --destination-port 135 -j DROP"
 
@@ -317,3 +361,22 @@ def fix_rpc(rpc_tuple):
 		port++
 		os.system(block_loopback)
 		os.system(block_loopback_udp)
+
+def scan_services():
+	#SERVICE = "service --status-all"
+	#p = subprocess.Popen(SERVICE, stdout=subprocess.PIPE, shell=True)
+	#(services, err) = p.communicate()
+	#running_services = []
+	#running_services = services
+
+
+def nmap_vuln_ports():
+
+
+	for ports in VULNERABLE_PORTS:
+
+	scan = "nmap -p 1-65535 -T4 -A -vv" + " " + final_ip #+ " " + "&"
+
+	p = subprocess.Popen(scan, stdout=subprocess.PIPE, shell=True)
+	(scan_results, err) = p.communicate()
+	nmap_output 	    = scan_results

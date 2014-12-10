@@ -217,6 +217,7 @@ Clear-Text Services Fix (Services that lack encryption / send data in plain-text
 import os
 import sys
 import subprocess
+import re
 
 __copyright__ = 'BERK1337 Security Team'
 __author__	  = 'Trevor Davenport'
@@ -234,9 +235,10 @@ CLEAR_TEXT_PORTS    = [20,21,23,25,110,143,513,514,80]
 
 nmap_output         = []
 vuln_port_scan      = []
-final_ip 	    = ''
+final_ip 	    	= ''
+nmap_dict 			= {}
 
-
+####################################################################################################################
 
 def run_background_nmap():
 	#Determine if nmap is on system
@@ -270,7 +272,7 @@ def run_background_nmap():
 		#Really hacky way to find IP
 		IP_QUERY = 'ifconfig wlan0 | grep "inet addr" | awk "{print $2}" | sed "s/addr://"'
 		ip = subprocess.Popen(IP_QUERY, stdout=subprocess.PIPE, shell=True)
-		(ip_addr, err)     = ip.communicate()
+		(ip_addr, err) = ip.communicate()
 		ip_list 	   = []
 		ip_list 	   = ip_addr
 		final_ip 	   = ip_list.split()[1] #String of '192.168.1.X'
@@ -283,6 +285,7 @@ def run_background_nmap():
 		nmap_output 	    = scan_results
 		#nmap_output = nmap_output.split()
 
+####################################################################################################################
 
 def common_vuln_check():
 	''' _____________________________________ 
@@ -334,6 +337,11 @@ def common_vuln_check():
 	p = subprocess.Popen(SSH, stdout=subprocess.PIPE, shell=True)
 	(SSHversion, err) = p.communicate()
 
+	if err == None:
+		print "[*] ---------- SSH Not Installed on Computer ----------- [*]"
+		
+
+####################################################################################################################
 
 def fix_rpc(rpc_tuple):
 	rpc_list = rpc_tuple
@@ -362,6 +370,8 @@ def fix_rpc(rpc_tuple):
 		os.system(block_loopback)
 		os.system(block_loopback_udp)
 
+####################################################################################################################
+
 def scan_services():
 	#SERVICE = "service --status-all"
 	#p = subprocess.Popen(SERVICE, stdout=subprocess.PIPE, shell=True)
@@ -369,12 +379,66 @@ def scan_services():
 	#running_services = []
 	#running_services = services
 
+####################################################################################################################
 
 def nmap_vuln_ports():
 	scan = "nmap -p"
 	for ports in VULNERABLE_PORTS:
+	    #Build Scan String with Global Vulnerable Ports List
 	    scan += " " + str(ports)
 	scan += " -T4 -A -vv " + final_ip
-	p = subprocess.Popen(scan, stdout=subprocess.PIPE, shell=True)
+	p = subprocess.Popen(scan, bufsize=1000000, stdout=subprocess.PIPE, shell=True)
 	(scan_results, err) = p.communicate()
-	vuln_port_scan 	    = scan_results
+	if scan_results:
+		nmap_to_dict(scan_results)
+	else:
+		print "[*] -------- NMAP yielded no results for open ports ----------[*]"
+
+
+
+def nmap_to_dict(nmap_list):
+	'''
+		Converts nmap output into a searchable dictionary with readable keys
+
+		import re
+
+		  match = re.search(pat, str)
+		  match = re.search(r'\d+\d+\d+\d+/\w+\w+\w+.+', index)
+	'''
+	nmap_list        = nmap_list.split('\n')
+	services_list    = []
+	running_services = []
+
+	for word in nmap_list:
+			'''	
+			>>> services_list
+			[['38471/tcp', 'open', '', 'unknown'], ['48128/tcp', 'open', '', 'unknown'], 
+			['59556/tcp', 'open', '', 'unknown']]
+			'''
+		match = re.search(r'\d+\d+\d+/\w+\w+\w+.+', word)
+		if match:
+			services_list.append(match.group().split(' '))
+
+
+	for services in services_list:
+		'''	
+		['unknown', 'unknown', 'unknown']
+		'''
+		length = len(services)
+		running_services.append(services[length-1])
+
+
+	if services_list:
+		nmap_list['port'] = services_list
+		'''
+			>>> nmap_dict
+				{'port': [['36242/tcp' 'open' '' 'unknown', '41943/tcp' 'open'  '' 'unknown']]}
+
+		'''
+
+	#Prettify the Print Statements
+	print "[*] ----------- RUNNING SERVICES -------------"
+	print "[*] #	Service "
+	for elems in range(len(services_list)):
+		print "[*] " + str(elems+1) + " " services_list[elems]
+		
